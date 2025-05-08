@@ -126,9 +126,25 @@ export default function VideoRecorder() {
     setError(null);
     
     try {
-      // Generate a unique filename
-      const filename = `${uuidv4()}.webm`;
-      const filePath = `recordings/${filename}`;
+      // Get current user ID first
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('You must be logged in to save recordings');
+      }
+      
+      const userId = user.id;
+      
+      // Create the user folder if it doesn't exist (this is just a placeholder - folders are created automatically)
+      // We'll use the correct path structure: recordings/userId/
+      const userFolderPath = `recordings/${userId}/`;
+      
+      // Generate a unique filename with proper path structure
+      const timestamp = Date.now();
+      const filename = `${timestamp}-${uuidv4().substring(0, 8)}.webm`; // Add timestamp for better sorting
+      const filePath = `${userFolderPath}${filename}`; // Complete path: recordings/userId/filename.webm
+      
+      console.log(`Uploading to path: ${filePath}`);
       
       // Upload the video to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -163,7 +179,7 @@ export default function VideoRecorder() {
             rating,
             notes,
             video_url: publicUrl,
-            user_id: (await supabase.auth.getUser()).data.user?.id
+            user_id: userId  // Make sure to use the actual user ID here
           }
         ]);
       
