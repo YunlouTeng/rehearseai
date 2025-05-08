@@ -9,6 +9,12 @@ const nextConfig = {
   output: 'export',
   // Add trailing slashes for consistent routing
   trailingSlash: true,
+  // Manually set environment variables for static export
+  env: {
+    // Load from .env.local or use defaults
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  },
 };
 
 module.exports = nextConfig; 

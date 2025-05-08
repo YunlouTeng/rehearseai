@@ -1,12 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
+import runtimeConfig from './runtime-config';
 
-// Use default values for development to prevent crashes
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy-key-for-development';
+// Get values from runtime config with fallbacks
+const supabaseUrl = runtimeConfig.supabase.url || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co';
+const supabaseAnonKey = runtimeConfig.supabase.anonKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy-key-for-development';
 
 // Create a mock client if credentials are using the defaults
-const isMockClient = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const isMockClient = supabaseUrl === 'https://example.supabase.co' || !supabaseAnonKey;
 
 // Configure with options for better behavior in production environments like Netlify
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
