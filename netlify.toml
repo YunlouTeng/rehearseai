@@ -2,10 +2,15 @@
   command = "npm run build && node netlify/inject-env.js"
   publish = "out"
 
-# Handle SPA redirects
+# Handle Next.js routing
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "/_404.html"
+  status = 404
+
+[[redirects]]
+  from = "/_next/*"
+  to = "/_next/:splat"
   status = 200
 
 # Specify Node.js version

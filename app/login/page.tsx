@@ -1,28 +1,58 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase, isSupabaseMock } from '@/lib/supabase';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, isAuthenticated } = useAuth();
+  const { signIn, isAuthenticated, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>('');
+
+  // Check if Supabase is initialized correctly
+  useEffect(() => {
+    const checkSupabaseConfig = async () => {
+      try {
+        // Get the current config
+        const { data } = await supabase.auth.getSession();
+        
+        setDebugInfo(prev => prev + `\nSession check: ${data.session ? 'Has session' : 'No session'}`);
+        setDebugInfo(prev => prev + `\nUsing mock client: ${isSupabaseMock}`);
+        
+        // Try to get configuration from window
+        if (typeof window !== 'undefined') {
+          const hasConfig = !!window.REHEARSEAI_CONFIG?.supabase?.anonKey;
+          setDebugInfo(prev => prev + `\nWindow config found: ${hasConfig}`);
+        }
+      } catch (err) {
+        setDebugInfo(prev => prev + `\nError checking config: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    };
+    
+    checkSupabaseConfig();
+  }, []);
 
   // Redirect if already authenticated
-  React.useEffect(() => {
+  useEffect(() => {
+    setDebugInfo(prev => prev + `\nAuth state: ${isAuthenticated ? 'Authenticated' : 'Not authenticated'}`);
+    setDebugInfo(prev => prev + `\nAuth loading: ${authLoading}`);
+    
     if (isAuthenticated) {
+      setDebugInfo(prev => prev + '\nRedirecting to practice page');
       router.push('/practice');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, authLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setDebugInfo('Form submitted');
 
     if (!email || !password) {
       setError('Please enter both email and password');
@@ -31,16 +61,22 @@ export default function LoginPage() {
 
     try {
       setIsLoading(true);
+      setDebugInfo(prev => prev + '\nAttempting sign in');
+      
       const { error } = await signIn(email, password);
       
       if (error) {
         setError(error.message);
+        setDebugInfo(prev => prev + `\nSign in error: ${error.message}`);
         return;
       }
       
+      setDebugInfo(prev => prev + '\nSign in successful');
       // Login successful, redirect will happen via useEffect
     } catch (err: any) {
-      setError(err.message || 'An error occurred during login');
+      const errorMessage = err.message || 'An error occurred during login';
+      setError(errorMessage);
+      setDebugInfo(prev => prev + `\nException: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -114,6 +150,14 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
+        
+        {/* Debug information - only visible in development */}
+        {process.env.NODE_ENV !== 'production' && debugInfo && (
+          <div className="mt-8 p-4 bg-gray-100 rounded-md">
+            <h3 className="font-bold mb-2">Debug Information:</h3>
+            <pre className="text-xs whitespace-pre-wrap">{debugInfo}</pre>
+          </div>
+        )}
       </div>
     </div>
   );
