@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = "out"
+
+# Handle SPA redirects
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Specify Node.js version
+[build.environment]
+  NODE_VERSION = "18"
+  NPM_VERSION = "9" 
