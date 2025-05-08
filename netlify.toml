@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  command = "npm run build && node netlify/inject-env.js"
   publish = "out"
 
 # Handle SPA redirects
@@ -11,8 +11,4 @@
 # Specify Node.js version
 [build.environment]
   NODE_VERSION = "18"
-  NPM_VERSION = "9"
-
-# Custom build plugin to inject environment variables
-[[plugins]]
-  package = "./netlify/inject-env.js" 
+  NPM_VERSION = "9" 
