@@ -14,6 +14,42 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [browserInfo, setBrowserInfo] = useState<string>('');
+
+  // Detect browser
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const userAgent = window.navigator.userAgent;
+      const isChrome = userAgent.indexOf("Chrome") > -1 && userAgent.indexOf("Safari") > -1;
+      const isSafari = userAgent.indexOf("Safari") > -1 && userAgent.indexOf("Chrome") === -1;
+      
+      setBrowserInfo(`Browser: ${isChrome ? 'Chrome' : isSafari ? 'Safari' : 'Other'}`);
+      
+      // Check for third-party cookie blocking (common in Chrome)
+      if (isChrome) {
+        // Add specific Chrome debugging for cookies and localStorage
+        try {
+          // Test localStorage
+          localStorage.setItem('authTest', 'test');
+          const testValue = localStorage.getItem('authTest');
+          localStorage.removeItem('authTest');
+          
+          setDebugInfo(prev => prev + `\nLocalStorage test: ${testValue === 'test' ? 'Working' : 'Failed'}`);
+        } catch (e) {
+          setDebugInfo(prev => prev + `\nLocalStorage error: ${e instanceof Error ? e.message : String(e)}`);
+        }
+        
+        // Test cookies
+        try {
+          document.cookie = "authTestCookie=test; path=/; SameSite=Lax";
+          const hasCookie = document.cookie.indexOf('authTestCookie=test') !== -1;
+          setDebugInfo(prev => prev + `\nCookie test: ${hasCookie ? 'Working' : 'Failed'}`);
+        } catch (e) {
+          setDebugInfo(prev => prev + `\nCookie error: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+  }, []);
 
   // Check if Supabase is initialized correctly
   useEffect(() => {
@@ -26,9 +62,14 @@ export default function LoginPage() {
         setDebugInfo(prev => prev + `\nUsing mock client: ${isSupabaseMock}`);
         
         // Try to get configuration from window
-        if (typeof window !== 'undefined') {
-          const hasConfig = !!window.REHEARSEAI_CONFIG?.supabase?.anonKey;
+        if (typeof window !== 'undefined' && window.REHEARSEAI_CONFIG) {
+          const hasConfig = !!(window.REHEARSEAI_CONFIG.supabase?.anonKey);
           setDebugInfo(prev => prev + `\nWindow config found: ${hasConfig}`);
+          
+          // Show the actual URL (but not the key for security reasons)
+          if (window.REHEARSEAI_CONFIG.supabase?.url) {
+            setDebugInfo(prev => prev + `\nURL: ${window.REHEARSEAI_CONFIG.supabase.url}`);
+          }
         }
       } catch (err) {
         setDebugInfo(prev => prev + `\nError checking config: ${err instanceof Error ? err.message : String(err)}`);
@@ -52,7 +93,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setDebugInfo('Form submitted');
+    setDebugInfo(prev => `Form submitted\n${browserInfo}\n${prev}`);
 
     if (!email || !password) {
       setError('Please enter both email and password');
@@ -63,6 +104,8 @@ export default function LoginPage() {
       setIsLoading(true);
       setDebugInfo(prev => prev + '\nAttempting sign in');
       
+      // Force the auth to use localStorage if in Chrome
+      // This helps bypass potential issues with Chrome's third-party cookie blocking
       const { error } = await signIn(email, password);
       
       if (error) {
@@ -72,7 +115,13 @@ export default function LoginPage() {
       }
       
       setDebugInfo(prev => prev + '\nSign in successful');
-      // Login successful, redirect will happen via useEffect
+      
+      // Force reload after successful login in Chrome to ensure session is properly established
+      if (typeof window !== 'undefined' && window.navigator.userAgent.indexOf("Chrome") > -1) {
+        setDebugInfo(prev => prev + '\nForcing page reload for Chrome');
+        window.location.href = '/practice';
+      }
+      // For Safari, the normal router navigation should work
     } catch (err: any) {
       const errorMessage = err.message || 'An error occurred during login';
       setError(errorMessage);
@@ -151,10 +200,11 @@ export default function LoginPage() {
           </p>
         </div>
         
-        {/* Debug information - only visible in development */}
-        {process.env.NODE_ENV !== 'production' && debugInfo && (
+        {/* Debug information - always visible for troubleshooting browser issues */}
+        {debugInfo && (
           <div className="mt-8 p-4 bg-gray-100 rounded-md">
             <h3 className="font-bold mb-2">Debug Information:</h3>
+            <div className="text-xs mb-2">{browserInfo}</div>
             <pre className="text-xs whitespace-pre-wrap">{debugInfo}</pre>
           </div>
         )}

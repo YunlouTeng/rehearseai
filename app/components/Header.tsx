@@ -61,7 +61,7 @@ export default function Header() {
                 
                 <div className="flex items-center border-l border-gray-200 ml-2 pl-4">
                   <span className="text-sm text-gray-500 mr-3">
-                    {user?.email}
+                    {user?.name ? `Hi ${user.name}` : user?.email}
                   </span>
                   <button
                     onClick={handleSignOut}

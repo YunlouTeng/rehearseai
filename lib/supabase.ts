@@ -7,6 +7,12 @@ if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
   console.log(`[Supabase] URL: ${runtimeConfig.supabase.url}`);
   console.log(`[Supabase] Key available: ${Boolean(runtimeConfig.supabase.anonKey)}`);
   console.log(`[Supabase] Window config available: ${Boolean(window.REHEARSEAI_CONFIG?.supabase)}`);
+  
+  // Log browser information for debugging
+  const userAgent = window.navigator.userAgent;
+  const isChrome = userAgent.indexOf("Chrome") > -1 && userAgent.indexOf("Safari") > -1;
+  const isSafari = userAgent.indexOf("Safari") > -1 && userAgent.indexOf("Chrome") === -1;
+  console.log(`[Supabase] Browser: ${isChrome ? 'Chrome' : isSafari ? 'Safari' : 'Other'}`);
 }
 
 // Get values from runtime config with fallbacks
@@ -22,12 +28,48 @@ if (isMockClient && typeof window !== 'undefined') {
   console.warn('[Supabase] Missing API key:', !supabaseAnonKey);
 }
 
+// Determine storage type based on browser
+// localStorage is more reliable in Chrome due to third-party cookie issues
+const getStorageType = () => {
+  if (typeof window !== 'undefined') {
+    const userAgent = window.navigator.userAgent;
+    const isChrome = userAgent.indexOf("Chrome") > -1 && userAgent.indexOf("Safari") > -1;
+    
+    if (isChrome) {
+      console.log('[Supabase] Using localStorage for Chrome');
+      return 'localStorage';
+    }
+  }
+  // Default to using cookies with fallback to localStorage
+  return 'cookieStorage';
+};
+
 // Configure with options for better behavior in production environments like Netlify
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    // Use different storage strategy based on browser
+    storage: getStorageType() === 'localStorage' 
+      ? localStorage 
+      : {
+          getItem: (key) => {
+            const value = document.cookie
+              .split('; ')
+              .find((row) => row.startsWith(`${key}=`))
+              ?.split('=')[1];
+            return Promise.resolve(value);
+          },
+          setItem: (key, value) => {
+            document.cookie = `${key}=${value}; path=/; SameSite=Lax; Secure`;
+            return Promise.resolve();
+          },
+          removeItem: (key) => {
+            document.cookie = `${key}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+            return Promise.resolve();
+          }
+        }
   }
 });
 

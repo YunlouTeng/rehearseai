@@ -22,6 +22,7 @@ export default function HistoryPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
   const [expandedSession, setExpandedSession] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState<number | null>(null);
   
   useEffect(() => {
     async function fetchSessions() {
@@ -70,6 +71,35 @@ export default function HistoryPage() {
       setExpandedSession(null);
     } else {
       setExpandedSession(id);
+    }
+  };
+  
+  // Delete a session
+  const deleteSession = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this practice session? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      setIsDeleting(id);
+      
+      const { error } = await supabase
+        .from('practice_sessions')
+        .delete()
+        .eq('id', id.toString())
+        .eq('user_id', user?.id || '');
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Update the sessions list after successful deletion
+      setSessions((prevSessions) => prevSessions.filter(session => session.id !== id));
+    } catch (err) {
+      console.error('Error deleting practice session:', err);
+      setError('Failed to delete the practice session. Please try again later.');
+    } finally {
+      setIsDeleting(null);
     }
   };
   
@@ -175,13 +205,30 @@ export default function HistoryPage() {
                     )}
                     
                     {session.notes && (
-                      <div>
+                      <div className="mb-6">
                         <h3 className="text-lg font-medium mb-2">Your Notes</h3>
                         <div className="bg-gray-50 p-4 rounded-lg whitespace-pre-wrap">
                           {session.notes}
                         </div>
                       </div>
                     )}
+
+                    <div className="flex justify-end mt-4">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSession(session.id);
+                        }}
+                        disabled={isDeleting === session.id}
+                        className={`px-4 py-2 rounded-md text-sm font-medium 
+                          ${isDeleting === session.id 
+                            ? 'bg-red-300 cursor-not-allowed' 
+                            : 'bg-red-600 text-white hover:bg-red-700'
+                          }`}
+                      >
+                        {isDeleting === session.id ? 'Deleting...' : 'Delete Session'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
