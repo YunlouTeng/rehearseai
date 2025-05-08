@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
-import RecordRTC from 'recordrtc';
 
 type RecordingStatus = 'idle' | 'recording' | 'recorded' | 'uploading' | 'success' | 'error';
 
@@ -19,7 +18,8 @@ export default function VideoRecorder() {
   const [savedVideoUrl, setSavedVideoUrl] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const recorderRef = useRef<RecordRTC | null>(null);
+  // Use 'any' type to avoid requiring RecordRTC type during SSR
+  const recorderRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   // Sample interview questions
@@ -46,13 +46,13 @@ export default function VideoRecorder() {
   // Clean up on unmount
   useEffect(() => {
     return () => {
-      if (streamRef.current) {
+      if (streamRef.current && typeof window !== 'undefined') {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
-      if (videoURL) {
+      if (videoURL && typeof window !== 'undefined') {
         URL.revokeObjectURL(videoURL);
       }
-      if (recorderRef.current) {
+      if (recorderRef.current && typeof window !== 'undefined') {
         recorderRef.current.destroy();
       }
     };
@@ -60,6 +60,9 @@ export default function VideoRecorder() {
 
   // Start recording
   const startRecording = async () => {
+    // Guard against server-side execution
+    if (typeof window === 'undefined') return;
+
     setStatus('recording');
     setError(null);
     
@@ -76,10 +79,13 @@ export default function VideoRecorder() {
         videoRef.current.play();
       }
       
-      const recorder = new RecordRTC(stream, {
+      // Dynamically import RecordRTC to ensure it's only loaded client-side
+      const RecordRTCModule = await import('recordrtc');
+      
+      const recorder = new RecordRTCModule.default(stream, {
         type: 'video',
         mimeType: 'video/webm;codecs=vp8',
-        recorderType: RecordRTC.MediaStreamRecorder,
+        recorderType: RecordRTCModule.default.MediaStreamRecorder,
         disableLogs: true,
         videoBitsPerSecond: 128000,
         audioBitsPerSecond: 128000
@@ -97,6 +103,9 @@ export default function VideoRecorder() {
 
   // Stop recording
   const stopRecording = () => {
+    // Guard against server-side execution
+    if (typeof window === 'undefined') return;
+
     if (recorderRef.current) {
       recorderRef.current.stopRecording(() => {
         const blob = recorderRef.current?.getBlob();
@@ -122,6 +131,9 @@ export default function VideoRecorder() {
 
   // Upload video to Supabase
   const uploadVideo = async () => {
+    // Guard against server-side execution
+    if (typeof window === 'undefined') return;
+
     if (!videoBlob) {
       setError('No video recorded');
       return;
@@ -205,14 +217,14 @@ export default function VideoRecorder() {
     setStatus('idle');
     setError(null);
     setVideoBlob(null);
-    if (videoURL) {
+    if (videoURL && typeof window !== 'undefined') {
       URL.revokeObjectURL(videoURL);
       setVideoURL(null);
     }
     setSavedVideoUrl(null);
     setUploadProgress(0);
     generateQuestion();
-    if (recorderRef.current) {
+    if (recorderRef.current && typeof window !== 'undefined') {
       recorderRef.current.destroy();
       recorderRef.current = null;
     }
