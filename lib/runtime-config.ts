@@ -1,11 +1,33 @@
+// Types for runtime configuration
+interface SupabaseConfig {
+  url: string;
+  anonKey: string;
+}
+
+interface RuntimeConfig {
+  supabase: SupabaseConfig;
+}
+
 // Runtime configuration that can be updated even after the build
-const runtimeConfig = {
+const runtimeConfig: RuntimeConfig = {
   // Default to actual environment variables if available
   supabase: {
     url: process.env.NEXT_PUBLIC_SUPABASE_URL || "https://yvktzaevvikkzmyquhsy.supabase.co",
     anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
   }
 };
+
+// Define window interface
+declare global {
+  interface Window {
+    REHEARSEAI_CONFIG?: {
+      supabase?: {
+        url?: string;
+        anonKey?: string;
+      };
+    };
+  }
+}
 
 // If we're in the browser, check for config from window
 if (typeof window !== 'undefined' && window.REHEARSEAI_CONFIG) {

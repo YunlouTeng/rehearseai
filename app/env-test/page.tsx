@@ -3,6 +3,18 @@
 import { useState, useEffect } from 'react';
 import runtimeConfig from '../../lib/runtime-config';
 
+// Define type for window config
+declare global {
+  interface Window {
+    REHEARSEAI_CONFIG?: {
+      supabase?: {
+        url?: string;
+        anonKey?: string;
+      };
+    };
+  }
+}
+
 export default function EnvTestPage() {
   const [config, setConfig] = useState<any>(null);
   const [windowConfig, setWindowConfig] = useState<any>(null);
@@ -19,12 +31,15 @@ export default function EnvTestPage() {
 
     // Get values from window config
     if (typeof window !== 'undefined' && window.REHEARSEAI_CONFIG) {
+      const config = window.REHEARSEAI_CONFIG;
       setWindowConfig({
-        supabaseUrl: window.REHEARSEAI_CONFIG.supabase?.url,
-        supabaseKeyFirstChars: window.REHEARSEAI_CONFIG.supabase?.anonKey
-          ? `${window.REHEARSEAI_CONFIG.supabase.anonKey.substring(0, 5)}...`
+        supabaseUrl: config.supabase?.url || 'not set',
+        supabaseKeyFirstChars: config.supabase?.anonKey
+          ? `${config.supabase.anonKey.substring(0, 5)}...`
           : 'not set'
       });
+    } else {
+      setWindowConfig({ status: 'Window config not available' });
     }
 
     // Get values from process.env
