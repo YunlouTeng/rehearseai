@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
+import RecordRTC from 'recordrtc';
 
 type RecordingStatus = 'idle' | 'recording' | 'recorded' | 'uploading' | 'success' | 'error';
 
@@ -18,9 +19,8 @@ export default function VideoRecorder() {
   const [savedVideoUrl, setSavedVideoUrl] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recorderRef = useRef<RecordRTC | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
 
   // Sample interview questions
   const questions = [
@@ -52,6 +52,9 @@ export default function VideoRecorder() {
       if (videoURL) {
         URL.revokeObjectURL(videoURL);
       }
+      if (recorderRef.current) {
+        recorderRef.current.destroy();
+      }
     };
   }, [videoURL]);
 
@@ -59,7 +62,6 @@ export default function VideoRecorder() {
   const startRecording = async () => {
     setStatus('recording');
     setError(null);
-    chunksRef.current = [];
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -71,32 +73,21 @@ export default function VideoRecorder() {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.play();
       }
       
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
+      const recorder = new RecordRTC(stream, {
+        type: 'video',
+        mimeType: 'video/webm;codecs=vp8',
+        recorderType: RecordRTC.MediaStreamRecorder,
+        disableLogs: true,
+        videoBitsPerSecond: 128000,
+        audioBitsPerSecond: 128000
+      });
       
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
-      };
+      recorderRef.current = recorder;
+      recorder.startRecording();
       
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        
-        setVideoBlob(blob);
-        setVideoURL(url);
-        setStatus('recorded');
-        
-        if (videoRef.current) {
-          videoRef.current.srcObject = null;
-          videoRef.current.src = url;
-        }
-      };
-      
-      mediaRecorder.start();
     } catch (err) {
       console.error('Error accessing media devices:', err);
       setError('Could not access camera or microphone');
@@ -106,8 +97,22 @@ export default function VideoRecorder() {
 
   // Stop recording
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    if (recorderRef.current) {
+      recorderRef.current.stopRecording(() => {
+        const blob = recorderRef.current?.getBlob();
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          
+          setVideoBlob(blob);
+          setVideoURL(url);
+          setStatus('recorded');
+          
+          if (videoRef.current) {
+            videoRef.current.srcObject = null;
+            videoRef.current.src = url;
+          }
+        }
+      });
       
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -179,7 +184,7 @@ export default function VideoRecorder() {
             rating,
             notes,
             video_url: publicUrl,
-            user_id: userId  // Make sure to use the actual user ID here
+            user_id: userId
           }
         ]);
       
@@ -207,6 +212,10 @@ export default function VideoRecorder() {
     setSavedVideoUrl(null);
     setUploadProgress(0);
     generateQuestion();
+    if (recorderRef.current) {
+      recorderRef.current.destroy();
+      recorderRef.current = null;
+    }
   };
 
   return (
