@@ -17,6 +17,7 @@ export default function TailoredQuestionsPage() {
   const [questions, setQuestions] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   const handleResumeTextExtracted = (text: string, fileUrl: string, filename: string) => {
     setResumeText(text);
@@ -35,23 +36,52 @@ export default function TailoredQuestionsPage() {
     }
 
     setError(null);
+    setDebugInfo(null);
     setIsGenerating(true);
 
     try {
-      let generatedQuestions;
+      // Check if we're in Chrome (for debugging)
+      const isChrome = typeof window !== 'undefined' && 
+        window.navigator.userAgent.indexOf("Chrome") > -1 && 
+        window.navigator.userAgent.indexOf("Safari") > -1;
       
-      // Use the real API if OPENAI_API_KEY is available, otherwise use mock data
-      if (process.env.NEXT_PUBLIC_OPENAI_API_KEY) {
-        generatedQuestions = await generateTailoredQuestions(resumeText, jobDescription);
-      } else {
-        // Use mock data for development or when API key is not available
-        generatedQuestions = generateMockQuestions(resumeText, jobDescription);
+      if (isChrome) {
+        setDebugInfo('Using Chrome browser');
+      }
+      
+      // Check OpenAI API key availability
+      const openAiKeyAvailable = typeof window !== 'undefined' && 
+        window.REHEARSEAI_CONFIG?.openai?.apiKey;
+      setDebugInfo(prev => `${prev || ''}\nOpenAI API key available: ${!!openAiKeyAvailable}`);
+      
+      // Generate questions (will automatically use mock data if API key is not available)
+      const generatedQuestions = await generateTailoredQuestions(resumeText, jobDescription);
+      
+      if (generatedQuestions.length === 0) {
+        setError('No questions were generated. Please try again with a more detailed job description.');
+        return;
       }
       
       setQuestions(generatedQuestions);
+      setDebugInfo(prev => `${prev || ''}\nSuccessfully generated ${generatedQuestions.length} questions`);
     } catch (err) {
       console.error('Error generating questions:', err);
       setError(err instanceof Error ? err.message : 'An error occurred while generating questions.');
+      
+      // Add more helpful debug info
+      if (err instanceof Error) {
+        setDebugInfo(`Error details: ${err.message}\n${err.stack || ''}`);
+      }
+      
+      // Automatically fall back to mock questions on error
+      try {
+        const mockQuestions = generateMockQuestions(resumeText, jobDescription);
+        setQuestions(mockQuestions);
+        setDebugInfo(prev => `${prev || ''}\nFell back to sample questions due to error`);
+        setError("Couldn't connect to OpenAI API. Using sample questions instead.");
+      } catch (mockErr) {
+        console.error('Error generating mock questions:', mockErr);
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -114,7 +144,13 @@ export default function TailoredQuestionsPage() {
 
         {error && (
           <div className="p-4 mb-6 bg-red-50 border border-red-100 rounded-lg">
-            <p className="text-red-800">Error: {error}</p>
+            <p className="text-red-800">{error}</p>
+            {debugInfo && (
+              <details className="mt-2">
+                <summary className="text-sm text-red-600 cursor-pointer">Debug information</summary>
+                <pre className="mt-2 p-2 bg-gray-100 text-xs overflow-auto rounded">{debugInfo}</pre>
+              </details>
+            )}
           </div>
         )}
 

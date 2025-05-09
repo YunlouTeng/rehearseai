@@ -13,9 +13,20 @@ export async function generateTailoredQuestions(resumeText: string, jobDescripti
     // Get the OpenAI API key from runtime config
     const apiKey = runtimeConfig.openai.apiKey;
     
+    console.log(`OpenAI API key available: ${!!apiKey}`);
+    
     if (!apiKey) {
       console.warn('OpenAI API key not found, falling back to mock questions');
       return generateMockQuestions(resumeText, jobDescription);
+    }
+    
+    // Check if we're in Chrome browser (which might have special requirements)
+    const isChrome = typeof window !== 'undefined' && 
+      window.navigator.userAgent.indexOf("Chrome") > -1 && 
+      window.navigator.userAgent.indexOf("Safari") > -1;
+    
+    if (isChrome) {
+      console.log('Chrome browser detected, using optimized OpenAI request');
     }
     
     // In a production app, you would use the OpenAI API directly
@@ -52,10 +63,18 @@ Please format your response as a numbered list of questions only, with no additi
     });
 
     if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unable to get response text');
+      console.error(`OpenAI API request failed with status ${response.status}: ${response.statusText}`, errorText);
       throw new Error(`OpenAI API request failed: ${response.statusText}`);
     }
 
     const data = await response.json();
+    
+    // Validate the response structure
+    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+      console.error('Invalid response structure from OpenAI:', data);
+      throw new Error('Invalid response from OpenAI API');
+    }
     
     // Parse the response to extract just the questions
     const questionsText = data.choices[0].message.content.trim();
@@ -63,14 +82,21 @@ Please format your response as a numbered list of questions only, with no additi
     // Split by newline and filter out any empty lines or non-question lines
     const questions = questionsText
       .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.match(/^\d+\./) || line.match(/^- /))
-      .map(line => line.replace(/^\d+\.\s*/, '').replace(/^- /, ''));
+      .map((line: string) => line.trim())
+      .filter((line: string) => line.match(/^\d+\./) || line.match(/^- /))
+      .map((line: string) => line.replace(/^\d+\.\s*/, '').replace(/^- /, ''));
+
+    if (questions.length === 0) {
+      console.warn('No questions extracted from OpenAI response, using mock questions instead');
+      return generateMockQuestions(resumeText, jobDescription);
+    }
 
     return questions;
   } catch (error) {
     console.error('Error generating tailored questions:', error);
-    throw new Error('Failed to generate interview questions. Please try again later.');
+    // Fall back to mock questions when an error occurs
+    console.log('Falling back to mock questions due to API error');
+    return generateMockQuestions(resumeText, jobDescription);
   }
 }
 

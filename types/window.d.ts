@@ -5,5 +5,8 @@ interface Window {
       url?: string;
       anonKey?: string;
     };
+    openai?: {
+      apiKey?: string;
+    };
   };
 } 
