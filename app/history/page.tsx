@@ -83,14 +83,42 @@ export default function HistoryPage() {
     try {
       setIsDeleting(id);
       
-      const { error } = await supabase
+      // Find the session to get the video_url
+      const sessionToDelete = sessions.find(session => session.id === id);
+      
+      if (sessionToDelete && sessionToDelete.video_url) {
+        try {
+          // Extract file path from URL. Example: https://<project>.supabase.co/storage/v1/object/public/interview-recordings/recordings/user_id/filename.webm
+          // We need to extract "recordings/user_id/filename.webm"
+          const urlParts = sessionToDelete.video_url.split('/interview-recordings/');
+          if (urlParts.length > 1) {
+            const filePath = urlParts[1];
+            const { error: storageError } = await supabase.storage
+              .from('interview-recordings')
+              .remove([filePath]);
+            
+            if (storageError) {
+              // Log the error, but proceed with deleting the database record
+              console.error('Error deleting video from storage:', storageError);
+              // Optionally, you could set a different error message for the user here
+            }
+          } else {
+            console.warn('Could not parse file path from video_url:', sessionToDelete.video_url);
+          }
+        } catch (storageErr) {
+          console.error('Exception during storage deletion:', storageErr);
+        }
+      }
+      
+      // Delete the metadata from the database
+      const { error: dbError } = await supabase
         .from('practice_sessions')
         .delete()
         .eq('id', id.toString())
         .eq('user_id', user?.id || '');
       
-      if (error) {
-        throw error;
+      if (dbError) {
+        throw dbError;
       }
       
       // Update the sessions list after successful deletion
