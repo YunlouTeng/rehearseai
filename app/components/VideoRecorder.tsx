@@ -90,8 +90,8 @@ export default function VideoRecorder() {
         mimeType: 'video/webm;codecs=vp8',
         recorderType: RecordRTCModule.default.MediaStreamRecorder,
         disableLogs: true,
-        videoBitsPerSecond: 128000,
-        audioBitsPerSecond: 128000
+        videoBitsPerSecond: 1024000,
+        audioBitsPerSecond: 256000
       });
       
       recorderRef.current = recorder;
