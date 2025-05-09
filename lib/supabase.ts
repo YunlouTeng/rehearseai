@@ -5,17 +5,23 @@ import runtimeConfig from './runtime-config';
 // Check if we're running in a browser environment
 const isBrowser = typeof window !== 'undefined';
 
+// Debug log helper with timestamp
+const logDebug = (message: string, data?: any) => {
+  const time = new Date().toLocaleTimeString();
+  console.log(`[${time}] [Supabase] ${message}`, data || '');
+};
+
 // Log configuration in development (without exposing keys)
 if (process.env.NODE_ENV !== 'production' && isBrowser) {
-  console.log(`[Supabase] URL: ${runtimeConfig.supabase.url}`);
-  console.log(`[Supabase] Key available: ${Boolean(runtimeConfig.supabase.anonKey)}`);
-  console.log(`[Supabase] Window config available: ${Boolean(window.REHEARSEAI_CONFIG?.supabase)}`);
+  logDebug(`URL: ${runtimeConfig.supabase.url}`);
+  logDebug(`Key available: ${Boolean(runtimeConfig.supabase.anonKey)}`);
+  logDebug(`Window config available: ${Boolean(window.REHEARSEAI_CONFIG?.supabase)}`);
   
   // Log browser information for debugging
   const userAgent = window.navigator.userAgent;
   const isChrome = userAgent.indexOf("Chrome") > -1 && userAgent.indexOf("Safari") > -1;
   const isSafari = userAgent.indexOf("Safari") > -1 && userAgent.indexOf("Chrome") === -1;
-  console.log(`[Supabase] Browser: ${isChrome ? 'Chrome' : isSafari ? 'Safari' : 'Other'}`);
+  logDebug(`Browser: ${isChrome ? 'Chrome' : isSafari ? 'Safari' : 'Other'}`);
 }
 
 // Get values from runtime config with fallbacks
@@ -31,40 +37,67 @@ if (isMockClient && isBrowser) {
   console.warn('[Supabase] Missing API key:', !supabaseAnonKey);
 }
 
-// Determine storage type based on browser
-// localStorage is more reliable in Chrome due to third-party cookie issues
-const getStorageType = () => {
-  if (isBrowser) {
-    const userAgent = window.navigator.userAgent;
-    const isChrome = userAgent.indexOf("Chrome") > -1 && userAgent.indexOf("Safari") > -1;
-    
-    if (isChrome) {
-      console.log('[Supabase] Using localStorage for Chrome');
-      return 'localStorage';
-    }
-  }
-  // Default to using cookies with fallback to localStorage
-  return 'cookieStorage';
+// Define browser-specific auth options
+const getBrowserAuthOptions = () => {
+  logDebug('Creating browser auth config');
+  return {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storageKey: 'supabase.auth.token',
+    storage: localStorage,
+    // Add additional debugging for auth events
+    debug: process.env.NODE_ENV !== 'production',
+    // Ensure proper URL redirects
+    flowType: 'implicit',
+  };
 };
 
 // Create authentication options with browser-safe localStorage usage
 const authOptions = isBrowser 
-  ? {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      storageKey: 'supabase.auth.token',
-      storage: localStorage
-    }
+  ? getBrowserAuthOptions()
   : {
       // For server-side rendering, use minimal options without storage
       autoRefreshToken: false,
       persistSession: false
     };
 
+// Log auth configuration
+if (isBrowser) {
+  logDebug('Auth configuration', { 
+    persistSession: authOptions.persistSession,
+    storage: authOptions.storage ? 'localStorage' : 'none'
+  });
+}
+
 // Create the Supabase client with appropriate options
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: authOptions
+  auth: authOptions,
+  global: {
+    // Add request and response handling for debugging
+    fetch: async (url, options) => {
+      const startTime = Date.now();
+      try {
+        const response = await fetch(url, options);
+        const endTime = Date.now();
+        
+        if (!response.ok && isBrowser) {
+          logDebug(`API request failed: ${url}`, {
+            status: response.status,
+            statusText: response.statusText,
+            time: endTime - startTime
+          });
+        }
+        
+        return response;
+      } catch (error) {
+        if (isBrowser) {
+          logDebug(`API request error: ${url}`, error);
+        }
+        throw error;
+      }
+    }
+  }
 });
 
 // Add a flag to check if we're using a mock client
@@ -79,26 +112,43 @@ export type User = {
 
 export async function getCurrentUser(): Promise<User | null> {
   try {
+    if (isBrowser) {
+      logDebug('Getting current user');
+    }
+    
     const { data: { user }, error } = await supabase.auth.getUser();
     
     if (error) {
-      console.error('[Supabase] Error getting current user:', error.message);
+      if (isBrowser) {
+        console.error('[Supabase] Error getting current user:', error.message);
+      }
       return null;
     }
     
     if (!user) return null;
     
-    return {
+    const userData = {
       id: user.id,
       email: user.email || undefined,
       name: user.user_metadata?.name as string | undefined,
     };
+    
+    if (isBrowser) {
+      logDebug('Current user retrieved', { id: userData.id, email: userData.email });
+    }
+    
+    return userData;
   } catch (err) {
-    console.error('[Supabase] Exception in getCurrentUser:', err);
+    if (isBrowser) {
+      console.error('[Supabase] Exception in getCurrentUser:', err);
+    }
     return null;
   }
 }
 
 export async function signOut() {
+  if (isBrowser) {
+    logDebug('Signing out user');
+  }
   return supabase.auth.signOut();
 } 

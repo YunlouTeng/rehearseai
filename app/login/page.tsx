@@ -107,7 +107,11 @@ export default function LoginPage() {
       setIsLoading(true);
       setDebugInfo(prev => prev + '\nAttempting sign in');
       
-      const { error } = await signIn(email, password);
+      // Call Supabase directly for more control and debugging
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
       
       if (error) {
         setError(error.message);
@@ -115,12 +119,22 @@ export default function LoginPage() {
         return;
       }
       
+      // Log session information for debugging
       setDebugInfo(prev => prev + '\nSign in successful');
+      setDebugInfo(prev => prev + `\nSession: ${data.session ? 'Created' : 'Missing'}`);
       
-      // Force a full page refresh on all browsers
-      // This ensures the session is properly established
-      if (isBrowser) {
-        window.location.href = '/practice';
+      if (data.session) {
+        setDebugInfo(prev => prev + `\nUser ID: ${data.session.user.id.substring(0, 8)}...`);
+        
+        // Set a short delay to allow auth state to propagate
+        setTimeout(() => {
+          if (isBrowser) {
+            setDebugInfo(prev => prev + '\nNavigating to practice page...');
+            window.location.href = '/practice';
+          }
+        }, 500);
+      } else {
+        setDebugInfo(prev => prev + '\nWarning: No session after login!');
       }
       
     } catch (err: any) {

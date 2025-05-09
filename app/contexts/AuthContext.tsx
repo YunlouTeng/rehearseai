@@ -7,7 +7,7 @@ type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ data?: any, error: Error | null }>;
   signUp: (email: string, password: string, name: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -15,54 +15,100 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Console log helper with timestamp for debugging
+const logWithTime = (message: string, data?: any) => {
+  const time = new Date().toLocaleTimeString();
+  console.log(`[${time}] ${message}`, data || '');
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Initialize user session
   useEffect(() => {
+    logWithTime('AuthProvider: Initializing');
+    
     // Get initial user
     const initUser = async () => {
       try {
-        const user = await getCurrentUser();
-        setUser(user);
+        // First check for existing session
+        const { data } = await supabase.auth.getSession();
+        logWithTime('AuthProvider: Initial session check', data.session ? 'Has session' : 'No session');
+        
+        if (data.session) {
+          const user = await getCurrentUser();
+          logWithTime('AuthProvider: Setting initial user', user);
+          setUser(user);
+        } else {
+          logWithTime('AuthProvider: No initial user');
+          setUser(null);
+        }
       } catch (error) {
         console.error('Error getting initial user:', error);
       } finally {
         setIsLoading(false);
+        logWithTime('AuthProvider: Initialization complete');
       }
     };
 
-    initUser();
-
     // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[AuthContext] Auth state change event:', event);
+    const setupAuthListener = () => {
+      logWithTime('AuthProvider: Setting up auth listener');
       
-      if (event === 'SIGNED_IN' && session?.user) {
-        const user = await getCurrentUser();
-        setUser(user);
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        logWithTime(`AuthProvider: Auth state changed - ${event}`, session ? 'With session' : 'No session');
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+          try {
+            const user = await getCurrentUser();
+            logWithTime('AuthProvider: User signed in', user);
+            setUser(user);
+          } catch (err) {
+            console.error('Error setting user after sign in:', err);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          logWithTime('AuthProvider: User signed out');
+          setUser(null);
+        } else if (event === 'TOKEN_REFRESHED') {
+          logWithTime('AuthProvider: Token refreshed');
+          try {
+            const user = await getCurrentUser();
+            setUser(user);
+          } catch (err) {
+            console.error('Error refreshing user after token refresh:', err);
+          }
+        }
+        
         setIsLoading(false);
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setIsLoading(false);
-      } else if (event === 'TOKEN_REFRESHED') {
-        // Make sure we update the user when token is refreshed
-        const user = await getCurrentUser();
-        setUser(user);
-        setIsLoading(false);
-      }
-    });
+      });
+      
+      return subscription;
+    };
+
+    initUser();
+    const subscription = setupAuthListener();
 
     return () => {
+      logWithTime('AuthProvider: Cleaning up auth listener');
       subscription.unsubscribe();
     };
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      return { error };
+      logWithTime('AuthContext: Signing in user', email);
+      const response = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (response.error) {
+        logWithTime('AuthContext: Sign in error', response.error.message);
+      } else {
+        logWithTime('AuthContext: Sign in successful', response.data.user?.id);
+      }
+      
+      return response;
     } catch (error) {
+      logWithTime('AuthContext: Sign in exception', error);
       return { error: error as Error };
     }
   };
@@ -99,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOutUser = async () => {
+    logWithTime('AuthContext: Signing out user');
     await supabase.auth.signOut();
     setUser(null);
   };
