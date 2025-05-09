@@ -21,9 +21,38 @@ const logWithTime = (message: string, data?: any) => {
   console.log(`[${time}] ${message}`, data || '');
 };
 
+// Helper to check if we're in Chrome browser
+const isChrome = () => {
+  if (typeof window === 'undefined') return false;
+  const userAgent = window.navigator.userAgent;
+  return userAgent.indexOf("Chrome") > -1 && userAgent.indexOf("Safari") > -1;
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [chromeTimeoutId, setChromeTimeoutId] = useState<NodeJS.Timeout | null>(null);
+
+  // For Chrome: implement a failsafe timeout that stops loading state
+  useEffect(() => {
+    // Only apply this for Chrome browsers
+    if (isLoading && isChrome()) {
+      logWithTime('AuthProvider: Setting Chrome failsafe timeout');
+      
+      // If we're stuck in loading state for more than 5 seconds in Chrome, 
+      // force it to false to avoid endless loading
+      const timeoutId = setTimeout(() => {
+        logWithTime('AuthProvider: Chrome failsafe triggered - forcing loading state to false');
+        setIsLoading(false);
+      }, 5000);
+      
+      setChromeTimeoutId(timeoutId);
+      
+      return () => {
+        if (timeoutId) clearTimeout(timeoutId);
+      };
+    }
+  }, [isLoading]);
 
   // Initialize user session
   useEffect(() => {
@@ -59,6 +88,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         logWithTime(`AuthProvider: Auth state changed - ${event}`, session ? 'With session' : 'No session');
         
+        // Clear any chrome timeouts when we receive events
+        if (chromeTimeoutId) {
+          clearTimeout(chromeTimeoutId);
+          setChromeTimeoutId(null);
+        }
+        
         if (event === 'SIGNED_IN' && session?.user) {
           try {
             const user = await getCurrentUser();
@@ -73,6 +108,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setTimeout(() => {
                 logWithTime('AuthProvider: State update confirmed after sign in');
               }, 100);
+            } else if (isChrome()) {
+              // Special handling for Chrome if getCurrentUser fails
+              logWithTime('AuthProvider: Chrome detected - using session directly for user data');
+              
+              // Use the session data directly in Chrome as a fallback
+              const userData = {
+                id: session.user.id,
+                email: session.user.email || undefined,
+                name: session.user.user_metadata?.name as string | undefined,
+              };
+              
+              setUser(userData);
+              setIsLoading(false);
+              logWithTime('AuthProvider: Chrome fallback user state updated');
             } else {
               logWithTime('AuthProvider: Failed to get user data after sign in');
               setIsLoading(false);

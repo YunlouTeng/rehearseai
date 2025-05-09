@@ -9,6 +9,13 @@ import { supabase, isSupabaseMock } from '@/lib/supabase';
 // Check if we're running in a browser environment
 const isBrowser = typeof window !== 'undefined';
 
+// Add a new function to determine if the browser is Chrome
+const isChromeBrowser = () => {
+  if (!isBrowser) return false;
+  const userAgent = window.navigator.userAgent;
+  return userAgent.indexOf("Chrome") > -1 && userAgent.indexOf("Safari") > -1;
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const { signIn, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -107,7 +114,10 @@ export default function LoginPage() {
       setIsLoading(true);
       setDebugInfo(prev => prev + '\nAttempting sign in');
       
-      // Call Supabase directly for more control and debugging
+      const isChrome = isChromeBrowser();
+      setDebugInfo(prev => prev + `\nUsing ${isChrome ? 'Chrome-optimized' : 'standard'} login flow`);
+      
+      // Call Supabase directly for login
       const { data, error } = await supabase.auth.signInWithPassword({ 
         email, 
         password 
@@ -116,6 +126,7 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
         setDebugInfo(prev => prev + `\nSign in error: ${error.message}`);
+        setIsLoading(false);
         return;
       }
       
@@ -126,7 +137,22 @@ export default function LoginPage() {
       if (data.session) {
         setDebugInfo(prev => prev + `\nUser ID: ${data.session.user.id.substring(0, 8)}...`);
         
-        // Create a forced auth check mechanism
+        // For Chrome, use a more direct approach
+        if (isChrome) {
+          setDebugInfo(prev => prev + '\nApplying Chrome-specific login workaround');
+          
+          // Force redirection after a brief delay, regardless of auth state
+          setTimeout(() => {
+            setDebugInfo(prev => prev + '\nForcing navigation for Chrome...');
+            if (isBrowser) {
+              window.location.href = '/practice';
+            }
+          }, 1000);
+          
+          return;
+        }
+        
+        // Create a forced auth check mechanism for non-Chrome browsers
         const maxRetries = 3;
         let retries = 0;
         let success = false;

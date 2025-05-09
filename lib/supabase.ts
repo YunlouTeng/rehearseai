@@ -114,8 +114,67 @@ export async function getCurrentUser(): Promise<User | null> {
   try {
     if (isBrowser) {
       logDebug('Getting current user');
+      
+      // Check if we're in Chrome
+      const userAgent = window.navigator.userAgent;
+      const isChrome = userAgent.indexOf("Chrome") > -1 && userAgent.indexOf("Safari") > -1;
+      
+      if (isChrome) {
+        logDebug('Chrome detected, using optimized user retrieval');
+        
+        // First try the standard approach
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (user) {
+          // Standard approach worked
+          logDebug('Successfully retrieved user in Chrome via standard method');
+          const userData = {
+            id: user.id,
+            email: user.email || undefined,
+            name: user.user_metadata?.name as string | undefined,
+          };
+          return userData;
+        }
+        
+        // If standard approach fails, try to get the session directly and extract user data
+        logDebug('Standard user retrieval failed in Chrome, trying session fallback');
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          logDebug('Retrieved user from session in Chrome');
+          const userData = {
+            id: session.user.id,
+            email: session.user.email || undefined,
+            name: session.user.user_metadata?.name as string || undefined,
+          };
+          return userData;
+        }
+        
+        // If all else fails, check localStorage directly as a last resort
+        try {
+          const authData = localStorage.getItem('supabase.auth.token');
+          if (authData) {
+            const parsedData = JSON.parse(authData);
+            if (parsedData?.currentSession?.user) {
+              logDebug('Retrieved user from localStorage in Chrome');
+              const user = parsedData.currentSession.user;
+              return {
+                id: user.id,
+                email: user.email || undefined,
+                name: user.user_metadata?.name as string || undefined,
+              };
+            }
+          }
+        } catch (storageErr) {
+          console.error('[Supabase] Error accessing localStorage:', storageErr);
+        }
+        
+        logDebug('All Chrome user retrieval methods failed');
+        return null;
+      }
     }
     
+    // Standard approach for non-Chrome browsers
     const { data: { user }, error } = await supabase.auth.getUser();
     
     if (error) {
