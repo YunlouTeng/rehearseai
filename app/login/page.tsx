@@ -104,8 +104,6 @@ export default function LoginPage() {
       setIsLoading(true);
       setDebugInfo(prev => prev + '\nAttempting sign in');
       
-      // Force the auth to use localStorage if in Chrome
-      // This helps bypass potential issues with Chrome's third-party cookie blocking
       const { error } = await signIn(email, password);
       
       if (error) {
@@ -116,12 +114,10 @@ export default function LoginPage() {
       
       setDebugInfo(prev => prev + '\nSign in successful');
       
-      // Force reload after successful login in Chrome to ensure session is properly established
-      if (typeof window !== 'undefined' && window.navigator.userAgent.indexOf("Chrome") > -1) {
-        setDebugInfo(prev => prev + '\nForcing page reload for Chrome');
-        window.location.href = '/practice';
-      }
-      // For Safari, the normal router navigation should work
+      // Force a full page refresh on all browsers
+      // This ensures the session is properly established
+      window.location.href = '/practice';
+      
     } catch (err: any) {
       const errorMessage = err.message || 'An error occurred during login';
       setError(errorMessage);
