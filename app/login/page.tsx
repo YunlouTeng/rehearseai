@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, isSupabaseMock } from '@/lib/supabase';
 
+// Check if we're running in a browser environment
+const isBrowser = typeof window !== 'undefined';
+
 export default function LoginPage() {
   const router = useRouter();
   const { signIn, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -18,7 +21,7 @@ export default function LoginPage() {
 
   // Detect browser
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (isBrowser) {
       const userAgent = window.navigator.userAgent;
       const isChrome = userAgent.indexOf("Chrome") > -1 && userAgent.indexOf("Safari") > -1;
       const isSafari = userAgent.indexOf("Safari") > -1 && userAgent.indexOf("Chrome") === -1;
@@ -62,7 +65,7 @@ export default function LoginPage() {
         setDebugInfo(prev => prev + `\nUsing mock client: ${isSupabaseMock}`);
         
         // Try to get configuration from window
-        if (typeof window !== 'undefined' && window.REHEARSEAI_CONFIG) {
+        if (isBrowser && window.REHEARSEAI_CONFIG) {
           const hasConfig = !!(window.REHEARSEAI_CONFIG.supabase?.anonKey);
           setDebugInfo(prev => prev + `\nWindow config found: ${hasConfig}`);
           
@@ -116,7 +119,9 @@ export default function LoginPage() {
       
       // Force a full page refresh on all browsers
       // This ensures the session is properly established
-      window.location.href = '/practice';
+      if (isBrowser) {
+        window.location.href = '/practice';
+      }
       
     } catch (err: any) {
       const errorMessage = err.message || 'An error occurred during login';

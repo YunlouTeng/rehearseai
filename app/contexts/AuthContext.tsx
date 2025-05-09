@@ -84,6 +84,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined') {
+        return { error: new Error('Cannot reset password during server-side rendering') };
+      }
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });

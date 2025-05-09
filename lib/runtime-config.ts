@@ -13,6 +13,9 @@ interface RuntimeConfig {
   openai: OpenAIConfig;
 }
 
+// Check if we're running in a browser environment
+const isBrowser = typeof window !== 'undefined';
+
 // Runtime configuration that can be updated even after the build
 const runtimeConfig: RuntimeConfig = {
   // Default to actual environment variables if available
@@ -41,7 +44,7 @@ declare global {
 }
 
 // If we're in the browser, check for config from window
-if (typeof window !== 'undefined' && window.REHEARSEAI_CONFIG) {
+if (isBrowser && window.REHEARSEAI_CONFIG) {
   // Override with window config if available
   if (window.REHEARSEAI_CONFIG.supabase?.url) {
     runtimeConfig.supabase.url = window.REHEARSEAI_CONFIG.supabase.url;

@@ -2,8 +2,11 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/supabase';
 import runtimeConfig from './runtime-config';
 
+// Check if we're running in a browser environment
+const isBrowser = typeof window !== 'undefined';
+
 // Log configuration in development (without exposing keys)
-if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
+if (process.env.NODE_ENV !== 'production' && isBrowser) {
   console.log(`[Supabase] URL: ${runtimeConfig.supabase.url}`);
   console.log(`[Supabase] Key available: ${Boolean(runtimeConfig.supabase.anonKey)}`);
   console.log(`[Supabase] Window config available: ${Boolean(window.REHEARSEAI_CONFIG?.supabase)}`);
@@ -22,7 +25,7 @@ const supabaseAnonKey = runtimeConfig.supabase.anonKey || process.env.NEXT_PUBLI
 // Create a mock client if credentials are using the defaults
 const isMockClient = supabaseUrl === 'https://example.supabase.co' || !supabaseAnonKey;
 
-if (isMockClient && typeof window !== 'undefined') {
+if (isMockClient && isBrowser) {
   console.warn('[Supabase] Using mock client - this will not work for authentication');
   console.warn('[Supabase] URL:', supabaseUrl);
   console.warn('[Supabase] Missing API key:', !supabaseAnonKey);
@@ -31,7 +34,7 @@ if (isMockClient && typeof window !== 'undefined') {
 // Determine storage type based on browser
 // localStorage is more reliable in Chrome due to third-party cookie issues
 const getStorageType = () => {
-  if (typeof window !== 'undefined') {
+  if (isBrowser) {
     const userAgent = window.navigator.userAgent;
     const isChrome = userAgent.indexOf("Chrome") > -1 && userAgent.indexOf("Safari") > -1;
     
@@ -44,16 +47,24 @@ const getStorageType = () => {
   return 'cookieStorage';
 };
 
-// Always use localStorage with Supabase Auth
-// This is more reliable for cross-browser compatibility including Chrome
+// Create authentication options with browser-safe localStorage usage
+const authOptions = isBrowser 
+  ? {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: 'supabase.auth.token',
+      storage: localStorage
+    }
+  : {
+      // For server-side rendering, use minimal options without storage
+      autoRefreshToken: false,
+      persistSession: false
+    };
+
+// Create the Supabase client with appropriate options
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storageKey: 'supabase.auth.token',
-    storage: localStorage
-  }
+  auth: authOptions
 });
 
 // Add a flag to check if we're using a mock client
