@@ -4,9 +4,7 @@ CREATE TABLE IF NOT EXISTS public.resume_files (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   file_url TEXT NOT NULL,
   filename TEXT NOT NULL,
-  upload_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  CONSTRAINT resume_files_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+  upload_date TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Add Row Level Security to resume_files table
@@ -39,9 +37,7 @@ CREATE TABLE IF NOT EXISTS public.custom_questions (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   question_text TEXT NOT NULL,
   source TEXT DEFAULT 'AI-generated',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  
-  CONSTRAINT custom_questions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Add Row Level Security to custom_questions table

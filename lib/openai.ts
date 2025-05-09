@@ -1,4 +1,5 @@
 // OpenAI API integration for generating personalized interview questions
+import runtimeConfig from './runtime-config';
 
 /**
  * Generate tailored interview questions based on resume and job description
@@ -9,13 +10,21 @@
  */
 export async function generateTailoredQuestions(resumeText: string, jobDescription: string): Promise<string[]> {
   try {
+    // Get the OpenAI API key from runtime config
+    const apiKey = runtimeConfig.openai.apiKey;
+    
+    if (!apiKey) {
+      console.warn('OpenAI API key not found, falling back to mock questions');
+      return generateMockQuestions(resumeText, jobDescription);
+    }
+    
     // In a production app, you would use the OpenAI API directly
     // For now, we'll use the fetch API to call the OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',

@@ -12,6 +12,7 @@ console.log(`Output directory: ${outputDir}`);
 // Get environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const openaiApiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
 
 // Validate environment variables
 if (!supabaseUrl) {
@@ -26,6 +27,7 @@ if (!supabaseAnonKey) {
 
 console.log(`✅ Found SUPABASE_URL: ${supabaseUrl.substring(0, 30)}...`);
 console.log(`✅ Found SUPABASE_ANON_KEY: ${supabaseAnonKey ? '[key available]' : '[key missing]'}`);
+console.log(`✅ Found OPENAI_API_KEY: ${openaiApiKey ? '[key available]' : '[key missing]'}`);
 
 // Create a config script to inject into the HTML
 const configScript = `
@@ -34,9 +36,16 @@ const configScript = `
     supabase: {
       url: "${supabaseUrl}",
       anonKey: "${supabaseAnonKey}"
+    },
+    openai: {
+      apiKey: "${openaiApiKey || ''}"
     }
   };
-  console.log('RehearseAI config loaded', { url: window.REHEARSEAI_CONFIG.supabase.url, keyAvailable: !!window.REHEARSEAI_CONFIG.supabase.anonKey });
+  console.log('RehearseAI config loaded', { 
+    url: window.REHEARSEAI_CONFIG.supabase.url, 
+    keyAvailable: !!window.REHEARSEAI_CONFIG.supabase.anonKey,
+    openaiKeyAvailable: !!window.REHEARSEAI_CONFIG.openai.apiKey
+  });
 </script>
 `;
 
