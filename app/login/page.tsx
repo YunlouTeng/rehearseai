@@ -117,93 +117,150 @@ export default function LoginPage() {
       const isChrome = isChromeBrowser();
       setDebugInfo(prev => prev + `\nUsing ${isChrome ? 'Chrome-optimized' : 'standard'} login flow`);
       
-      // Call Supabase directly for login
-      const { data, error } = await supabase.auth.signInWithPassword({ 
-        email, 
-        password 
-      });
-      
-      if (error) {
-        setError(error.message);
-        setDebugInfo(prev => prev + `\nSign in error: ${error.message}`);
-        setIsLoading(false);
-        return;
-      }
-      
-      // Log session information for debugging
-      setDebugInfo(prev => prev + '\nSign in successful');
-      setDebugInfo(prev => prev + `\nSession: ${data.session ? 'Created' : 'Missing'}`);
-      
-      if (data.session) {
-        setDebugInfo(prev => prev + `\nUser ID: ${data.session.user.id.substring(0, 8)}...`);
+      if (isChrome) {
+        // In Chrome, use a completely direct approach that bypasses all user retrieval
+        setDebugInfo(prev => prev + '\nUsing Chrome direct login strategy');
         
-        // For Chrome, use a more direct approach
-        if (isChrome) {
-          setDebugInfo(prev => prev + '\nApplying Chrome-specific login workaround');
+        try {
+          // Handle Chrome login separately
+          const { data, error } = await supabase.auth.signInWithPassword({ 
+            email, 
+            password 
+          });
           
-          // Force redirection after a brief delay, regardless of auth state
-          setTimeout(() => {
-            setDebugInfo(prev => prev + '\nForcing navigation for Chrome...');
-            if (isBrowser) {
+          if (error) {
+            setError(error.message);
+            setDebugInfo(prev => prev + `\nChrome login error: ${error.message}`);
+            setIsLoading(false);
+            return;
+          }
+          
+          if (!data.session) {
+            setError('Login was successful but no session was created');
+            setDebugInfo(prev => prev + '\nNo session in Chrome login response');
+            setIsLoading(false);
+            return;
+          }
+          
+          setDebugInfo(prev => prev + '\nChrome login successful - session created');
+          
+          // Store essential data into localStorage manually
+          try {
+            // First, get the user info directly from the session
+            const userData = {
+              id: data.session.user.id,
+              email: data.session.user.email || '',
+              name: data.session.user.user_metadata?.name || ''
+            };
+            
+            // Store in localStorage for access elsewhere in the app
+            localStorage.setItem('rehearseai-user', JSON.stringify(userData));
+            
+            setDebugInfo(prev => prev + '\nChrome user data cached to localStorage');
+            
+            // Forced navigation to practice page
+            setDebugInfo(prev => prev + '\nNavigating to practice...');
+            setTimeout(() => {
               window.location.href = '/practice';
-            }
-          }, 1000);
-          
+            }, 500);
+          } catch (storageErr) {
+            setDebugInfo(prev => prev + `\nChrome localStorage error: ${storageErr instanceof Error ? storageErr.message : String(storageErr)}`);
+            // Try to navigate anyway
+            window.location.href = '/practice';
+          }
+        } catch (chromeErr) {
+          setError('Error during Chrome login process');
+          setDebugInfo(prev => prev + `\nChrome login error: ${chromeErr instanceof Error ? chromeErr.message : String(chromeErr)}`);
+          setIsLoading(false);
+        }
+      } else {
+        // Standard login flow for non-Chrome browsers
+        const { data, error } = await supabase.auth.signInWithPassword({ 
+          email, 
+          password 
+        });
+        
+        if (error) {
+          setError(error.message);
+          setDebugInfo(prev => prev + `\nSign in error: ${error.message}`);
+          setIsLoading(false);
           return;
         }
         
-        // Create a forced auth check mechanism for non-Chrome browsers
-        const maxRetries = 3;
-        let retries = 0;
-        let success = false;
+        // Log session information for debugging
+        setDebugInfo(prev => prev + '\nSign in successful');
+        setDebugInfo(prev => prev + `\nSession: ${data.session ? 'Created' : 'Missing'}`);
         
-        const checkAuthState = async () => {
-          try {
-            // Force a new user check after successful login
-            const { data: userData } = await supabase.auth.getUser();
+        if (data.session) {
+          setDebugInfo(prev => prev + `\nUser ID: ${data.session.user.id.substring(0, 8)}...`);
+          
+          // For Chrome, use a more direct approach
+          if (isChrome) {
+            setDebugInfo(prev => prev + '\nApplying Chrome-specific login workaround');
             
-            if (userData.user) {
-              setDebugInfo(prev => prev + `\nForced auth check: User found`);
-              success = true;
-              
-              // Force a full page navigation
-              if (isBrowser) {
-                setDebugInfo(prev => prev + '\nNavigating to practice page...');
-                window.location.href = '/practice';
-              }
-              return;
-            }
-            
-            setDebugInfo(prev => prev + `\nForced auth check: No user found (attempt ${retries + 1})`);
-            
-            // Try a few more times with a delay
-            retries++;
-            if (retries < maxRetries) {
-              setDebugInfo(prev => prev + `\nRetrying auth check in 1 second...`);
-              setTimeout(checkAuthState, 1000);
-            } else if (!success) {
-              setDebugInfo(prev => prev + `\nAuth check failed after ${maxRetries} attempts, forcing navigation`);
-              // Force navigation even if checks fail
+            // Force redirection after a brief delay, regardless of auth state
+            setTimeout(() => {
+              setDebugInfo(prev => prev + '\nForcing navigation for Chrome...');
               if (isBrowser) {
                 window.location.href = '/practice';
               }
-            }
-          } catch (err) {
-            setDebugInfo(prev => prev + `\nError in forced auth check: ${err instanceof Error ? err.message : String(err)}`);
-            // Force navigation even if checks fail
-            if (isBrowser && !success && retries >= maxRetries - 1) {
-              window.location.href = '/practice';
-            }
+            }, 1000);
+            
+            return;
           }
-        };
-        
-        // Start the auth check process
-        setTimeout(checkAuthState, 1000);
-      } else {
-        setDebugInfo(prev => prev + '\nWarning: No session after login!');
-        setIsLoading(false);
+          
+          // Create a forced auth check mechanism for non-Chrome browsers
+          const maxRetries = 3;
+          let retries = 0;
+          let success = false;
+          
+          const checkAuthState = async () => {
+            try {
+              // Force a new user check after successful login
+              const { data: userData } = await supabase.auth.getUser();
+              
+              if (userData.user) {
+                setDebugInfo(prev => prev + `\nForced auth check: User found`);
+                success = true;
+                
+                // Force a full page navigation
+                if (isBrowser) {
+                  setDebugInfo(prev => prev + '\nNavigating to practice page...');
+                  window.location.href = '/practice';
+                }
+                return;
+              }
+              
+              setDebugInfo(prev => prev + `\nForced auth check: No user found (attempt ${retries + 1})`);
+              
+              // Try a few more times with a delay
+              retries++;
+              if (retries < maxRetries) {
+                setDebugInfo(prev => prev + `\nRetrying auth check in 1 second...`);
+                setTimeout(checkAuthState, 1000);
+              } else if (!success) {
+                setDebugInfo(prev => prev + `\nAuth check failed after ${maxRetries} attempts, forcing navigation`);
+                // Force navigation even if checks fail
+                if (isBrowser) {
+                  window.location.href = '/practice';
+                }
+              }
+            } catch (err) {
+              setDebugInfo(prev => prev + `\nError in forced auth check: ${err instanceof Error ? err.message : String(err)}`);
+              // Force navigation even if checks fail
+              if (isBrowser && !success && retries >= maxRetries - 1) {
+                window.location.href = '/practice';
+              }
+            }
+          };
+          
+          // Start the auth check process
+          setTimeout(checkAuthState, 1000);
+        } else {
+          setDebugInfo(prev => prev + '\nWarning: No session after login!');
+          setIsLoading(false);
+        }
       }
-      
     } catch (err: any) {
       const errorMessage = err.message || 'An error occurred during login';
       setError(errorMessage);
