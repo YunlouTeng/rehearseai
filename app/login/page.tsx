@@ -126,22 +126,62 @@ export default function LoginPage() {
       if (data.session) {
         setDebugInfo(prev => prev + `\nUser ID: ${data.session.user.id.substring(0, 8)}...`);
         
-        // Set a short delay to allow auth state to propagate
-        setTimeout(() => {
-          if (isBrowser) {
-            setDebugInfo(prev => prev + '\nNavigating to practice page...');
-            window.location.href = '/practice';
+        // Create a forced auth check mechanism
+        const maxRetries = 3;
+        let retries = 0;
+        let success = false;
+        
+        const checkAuthState = async () => {
+          try {
+            // Force a new user check after successful login
+            const { data: userData } = await supabase.auth.getUser();
+            
+            if (userData.user) {
+              setDebugInfo(prev => prev + `\nForced auth check: User found`);
+              success = true;
+              
+              // Force a full page navigation
+              if (isBrowser) {
+                setDebugInfo(prev => prev + '\nNavigating to practice page...');
+                window.location.href = '/practice';
+              }
+              return;
+            }
+            
+            setDebugInfo(prev => prev + `\nForced auth check: No user found (attempt ${retries + 1})`);
+            
+            // Try a few more times with a delay
+            retries++;
+            if (retries < maxRetries) {
+              setDebugInfo(prev => prev + `\nRetrying auth check in 1 second...`);
+              setTimeout(checkAuthState, 1000);
+            } else if (!success) {
+              setDebugInfo(prev => prev + `\nAuth check failed after ${maxRetries} attempts, forcing navigation`);
+              // Force navigation even if checks fail
+              if (isBrowser) {
+                window.location.href = '/practice';
+              }
+            }
+          } catch (err) {
+            setDebugInfo(prev => prev + `\nError in forced auth check: ${err instanceof Error ? err.message : String(err)}`);
+            // Force navigation even if checks fail
+            if (isBrowser && !success && retries >= maxRetries - 1) {
+              window.location.href = '/practice';
+            }
           }
-        }, 500);
+        };
+        
+        // Start the auth check process
+        setTimeout(checkAuthState, 1000);
       } else {
         setDebugInfo(prev => prev + '\nWarning: No session after login!');
+        setIsLoading(false);
       }
       
     } catch (err: any) {
       const errorMessage = err.message || 'An error occurred during login';
       setError(errorMessage);
       setDebugInfo(prev => prev + `\nException: ${errorMessage}`);
-    } finally {
       setIsLoading(false);
     }
   };

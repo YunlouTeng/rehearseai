@@ -63,24 +63,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const user = await getCurrentUser();
             logWithTime('AuthProvider: User signed in', user);
-            setUser(user);
+            
+            if (user) {
+              setUser(user);
+              setIsLoading(false);
+              logWithTime('AuthProvider: User state updated after sign in');
+              
+              // Force a brief timeout to ensure state is updated before any redirects
+              setTimeout(() => {
+                logWithTime('AuthProvider: State update confirmed after sign in');
+              }, 100);
+            } else {
+              logWithTime('AuthProvider: Failed to get user data after sign in');
+              setIsLoading(false);
+            }
           } catch (err) {
             console.error('Error setting user after sign in:', err);
+            setIsLoading(false);
           }
         } else if (event === 'SIGNED_OUT') {
           logWithTime('AuthProvider: User signed out');
           setUser(null);
+          setIsLoading(false);
         } else if (event === 'TOKEN_REFRESHED') {
           logWithTime('AuthProvider: Token refreshed');
           try {
             const user = await getCurrentUser();
-            setUser(user);
+            if (user) {
+              setUser(user);
+              logWithTime('AuthProvider: User updated after token refresh');
+            }
+            setIsLoading(false);
           } catch (err) {
             console.error('Error refreshing user after token refresh:', err);
+            setIsLoading(false);
           }
+        } else {
+          // Always make sure we're not stuck in loading state
+          setIsLoading(false);
         }
-        
-        setIsLoading(false);
       });
       
       return subscription;

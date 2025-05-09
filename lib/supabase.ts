@@ -48,8 +48,8 @@ const getBrowserAuthOptions = () => {
     storage: localStorage,
     // Add additional debugging for auth events
     debug: process.env.NODE_ENV !== 'production',
-    // Ensure proper URL redirects
-    flowType: 'implicit',
+    // Ensure proper URL redirects - use 'implicit' as a string (matching AuthFlowType)
+    flowType: 'implicit' as const
   };
 };
 
@@ -66,7 +66,7 @@ const authOptions = isBrowser
 if (isBrowser) {
   logDebug('Auth configuration', { 
     persistSession: authOptions.persistSession,
-    storage: authOptions.storage ? 'localStorage' : 'none'
+    storage: isBrowser ? 'localStorage' : 'none'
   });
 }
 
@@ -125,7 +125,22 @@ export async function getCurrentUser(): Promise<User | null> {
       return null;
     }
     
-    if (!user) return null;
+    if (!user) {
+      if (isBrowser) {
+        logDebug('No user found in auth response');
+      }
+      return null;
+    }
+    
+    // Log detailed user information for debugging
+    if (isBrowser) {
+      logDebug('Raw user data received', { 
+        id: user.id,
+        hasEmail: !!user.email,
+        hasMetadata: !!user.user_metadata,
+        createdAt: user.created_at
+      });
+    }
     
     const userData = {
       id: user.id,
