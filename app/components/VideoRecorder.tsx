@@ -260,6 +260,7 @@ export default function VideoRecorder() {
             ref={videoRef} 
             autoPlay={status === 'recording'} 
             controls={status === 'recorded' || status === 'success'} 
+            muted={status === 'recording'}
             className="w-full h-full"
           />
         )}
