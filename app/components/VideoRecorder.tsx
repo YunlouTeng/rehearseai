@@ -9,7 +9,11 @@ type RecordingStatus = 'idle' | 'recording' | 'recorded' | 'uploading' | 'succes
 // Define the type for practice session insert
 type PracticeSessionInsert = Database['public']['Tables']['practice_sessions']['Insert'];
 
-export default function VideoRecorder() {
+interface VideoRecorderProps {
+  initialQuestion?: string | null;
+}
+
+export default function VideoRecorder({ initialQuestion = null }: VideoRecorderProps) {
   const [status, setStatus] = useState<RecordingStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
@@ -41,10 +45,14 @@ export default function VideoRecorder() {
     setQuestion(questions[randomIndex]);
   };
 
-  // Initialize with a random question
+  // Initialize with a random question or use the provided initialQuestion
   useEffect(() => {
-    generateQuestion();
-  }, []);
+    if (initialQuestion) {
+      setQuestion(initialQuestion);
+    } else {
+      generateQuestion();
+    }
+  }, [initialQuestion]);
 
   // Clean up on unmount
   useEffect(() => {

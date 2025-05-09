@@ -28,6 +28,12 @@ export default function Home() {
           Start Practice Session
         </Link>
         <Link 
+          href="/tailored-questions" 
+          className="bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 transition-colors"
+        >
+          Generate Tailored Questions
+        </Link>
+        <Link 
           href="/history" 
           className="bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-medium hover:bg-gray-300 transition-colors"
         >

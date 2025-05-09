@@ -49,6 +49,17 @@ export default function Header() {
                 </Link>
                 
                 <Link
+                  href="/tailored-questions"
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                    pathname === '/tailored-questions'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+                >
+                  Tailored Questions
+                </Link>
+                
+                <Link
                   href="/history"
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
                     pathname === '/history'

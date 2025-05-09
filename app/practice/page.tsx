@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import QuestionGenerator from '../components/QuestionGenerator';
 import VideoRecorder from '../components/VideoRecorder';
@@ -31,6 +31,20 @@ export default function PracticePage() {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [customQuestion, setCustomQuestion] = useState<string | null>(null);
+  
+  // Check for custom question in localStorage when the component mounts
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Get custom question from localStorage (set by tailored-questions page)
+      const question = localStorage.getItem('practiceQuestion');
+      if (question) {
+        setCustomQuestion(question);
+        // Clear the question from localStorage to avoid persisting it
+        localStorage.removeItem('practiceQuestion');
+      }
+    }
+  }, []);
   
   // Handle question selection
   const handleQuestionSelect = (question: string) => {
@@ -221,14 +235,18 @@ export default function PracticePage() {
   
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-gray-50 py-12">
+      <div className="min-h-screen bg-gray-50 py-8">
         <div className="container mx-auto px-4">
           <h1 className="text-3xl font-bold mb-8 text-center">Practice Interview</h1>
-          <p className="text-center mb-8 max-w-xl mx-auto">
-            Record yourself answering interview questions, then review and rate your performance.
-            Your recordings will be saved so you can track your improvement over time.
-          </p>
-          <VideoRecorder />
+          
+          {customQuestion && (
+            <div className="max-w-2xl mx-auto mb-6 p-4 bg-blue-50 border border-blue-100 rounded-lg">
+              <h2 className="font-semibold mb-2">Using Your Tailored Question:</h2>
+              <p className="text-gray-800">{customQuestion}</p>
+            </div>
+          )}
+          
+          <VideoRecorder initialQuestion={customQuestion} />
         </div>
       </div>
     </AuthGuard>

@@ -38,6 +38,52 @@ export interface Database {
           user_id?: string
         }
       }
+      resume_files: {
+        Row: {
+          id: string
+          user_id: string
+          file_url: string
+          filename: string
+          upload_date: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          file_url: string
+          filename: string
+          upload_date?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          file_url?: string
+          filename?: string
+          upload_date?: string
+        }
+      }
+      custom_questions: {
+        Row: {
+          id: string
+          user_id: string
+          question_text: string
+          source: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          question_text: string
+          source?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          question_text?: string
+          source?: string
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
